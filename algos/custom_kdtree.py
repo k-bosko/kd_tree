@@ -1,3 +1,6 @@
+# Implementation code from:
+# https://scipy-cookbook.readthedocs.io/items/KDTree_example.html
+
 import numpy as np
 
 from .converter import BaseConverter
