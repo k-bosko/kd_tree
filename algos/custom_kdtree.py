@@ -1,149 +1,151 @@
-# Implementation code from:
-# https://scipy-cookbook.readthedocs.io/items/KDTree_example.html
-
-import numpy as np
-
 from .converter import BaseConverter
+import numpy as np
+from heapq import heappush, heappop
+from collections import Counter
+from statistics import median
+
+class AlternateMedian:
+  '''
+  Alternate through dimension and always use the median value to split.
+  '''
+  def __init__(self, dimension = -1, stopping_criteria = lambda x: len(x)<=1):
+    self.dim = dimension
+    self._should_stop_split = stopping_criteria
+    self.same_dim_values_count = 0
+
+  def get_split_dimension_value(self, data=None):
+    self.dim = (self.dim+1)%len(data[0])
+
+    dim_values = [example[self.dim] for example in data]
+    dim_values_counter = Counter(dim_values)
+
+    if len(dim_values_counter)==1:                    # All having the same values
+      self.same_dim_values_count+=1
+      if self.same_dim_values_count == len(data[0]):  # Gone through all dimension is still the same
+        median_val = dim_values[0]
+        # print("Exactly same values")
+        self._should_stop_split = lambda x: True
+        return self.dim, median_val
+      else:                                           # try the next dimension
+        return self.get_split_dimension_value(data)
+    elif len(dim_values_counter) ==2:
+      median_val = min(list(dim_values_counter.keys()))
+      return self.dim, median_val
+    else:
+      return self.dim, median(dim_values)
+
+  def should_stop_split(self, data=None):
+    return self._should_stop_split(data)
+
+  def clone(self):
+    return self.__class__(self.dim, self._should_stop_split)
+
+  def __str__(self):
+    return "AlternateMedian"
+
+class Node:
+  '''
+  A Tree node within the KDTree
+  '''
+  def __init__(self, data = None, split_value=None, split_dimension=None, left=None, right=None):
+    self.data = data
+    self.split_value, self.split_dimension = split_value, split_dimension
+    self.left, self.right = left, right
+
+  def __str__(self, offset = 0):
+    offsetTabs = "\t"*offset
+    desc = ""
+    desc= desc+ offsetTabs + "split_value: "+ str(self.split_value)+", split_dimension: "+ str(self.split_dimension)+"\n"
+    if self.data: desc= desc+ offsetTabs + "data: "+ str(self.data)+"\n"
+    if self.left: desc+= self.left.__str__(offset+1)
+    if self.right: desc+= self.right.__str__(offset+1)
+    return desc
 
 class KDTree:
-    def __init__(self):
-        self.kdtree = None
+  '''
+  Two main methods:
+  1. build_kdtree
+  2. search_knn --- given a query data, look for the top k nearest neighbor (NN)
+  '''
+  def __init__(self):
+    self.kdtree = None
 
-    def build_kdtree(self, data):
-        self.kdtree = self._build_kdtree(data)
+  def build_kdtree(self, data, KDStrategy):
+    self.kdtree = self._build_kdtree(data, KDStrategy)
 
-    def _build_kdtree(self, data, leafsize=2048):
-        ndim = data.shape[0]
-        ndata = data.shape[1]
+  def search_knn(self, query, k, dist_func=None, alpha=1):
+    if not self.kdtree: return None
+    if not dist_func: dist_func = self.euclidean
+    results = []  # max heap of size k; [(-dist, point)]
+    self._search(self.kdtree, results, query, dist_func, k, alpha)
+    # if len(results) > k: print("More than k nearest neigbor is found - ", len(results), "neighbors found")
+    return [res[1] for res in results][::-1] # reverse the list
 
-        hrect = np.zeros((2, data.shape[0]))
-        hrect[0,:] = data.min(axis=1)
-        hrect[1,:] = data.max(axis=1)
+  def _build_kdtree(self, data, KDStrategy):
+    if not data: return None
+    if KDStrategy.should_stop_split(data): return Node(data=data)
 
-        # create root of kd-tree
-        idx = np.argsort(data[0,:], kind='mergesort')
-        data[:,:] = data[:,idx]
-        splitval = data[0,ndata//2]
+    dimension, value = KDStrategy.get_split_dimension_value(data)
+    partition_left, partition_right = self._partition_by_dim_value(data, dimension, value)
 
-        left_hrect = hrect.copy()
-        right_hrect = hrect.copy()
-        left_hrect[1, 0] = splitval
-        right_hrect[0, 0] = splitval
+    return Node (
+        split_value = value,
+        split_dimension = dimension,
+        left = self._build_kdtree(partition_left, KDStrategy.clone()),
+        right = self._build_kdtree(partition_right, KDStrategy.clone())
+    )
 
-        self.kd_tree = [(None, None, left_hrect, right_hrect, None, None)]
+  def _search(self, node, results, query, dist_func, k, alpha = 1):
+    if not node: return
+    if node.data:
+      dist_vec = dist_func(node.data, query)
+      for i in range(len(node.data)):
+        dist = dist_vec[i]
+        example = node.data[i]
+        if len(results) < k or dist == -results[0][0]: heappush(results, (-dist, example))
+        elif dist < -results[0][0]:
+          heappush(results, (-dist, example))
+          heappop(results)
+      return
+    else:
+      dim, value = node.split_dimension, node.split_value
+      val_diff = query[dim] - value
 
-        stack = [(data[:,:ndata//2], idx[:ndata//2], 1, 0, True),
-                (data[:,ndata//2:], idx[ndata//2:], 1, 0, False)]
+      searchFirst, searchNext = node.left, node.right
+      if val_diff >0: searchFirst, searchNext = searchNext, searchFirst
 
-        while stack:
-            # pop data off stack
-            data, didx, depth, parent, leftbranch = stack.pop()
-            ndata = data.shape[1]
-            nodeptr = len(self.kd_tree)
+      self._search(searchFirst, results, query, dist_func, k, alpha)
+      # Pruning
+      if len(results)<k or dist_func(query[dim],value) < (-results[0][0]/alpha):
+        self._search(searchNext, results, query, dist_func, k, alpha)
+      return
 
-            # update parent node
+  def _partition_by_dim_value(self, data, dim, value):
+    partition_left, partition_right = [], []
+    for example in data:
+      if example[dim]<=value: partition_left.append(example)
+      else: partition_right.append(example)
+    return partition_left, partition_right
 
-            _didx, _data, _left_hrect, _right_hrect, left, right = self.kd_tree[parent]
-
-            self.kd_tree[parent] = (_didx, _data, _left_hrect, _right_hrect, nodeptr, right) if leftbranch \
-                else (_didx, _data, _left_hrect, _right_hrect, left, nodeptr)
-
-            # insert node in kd-tree
-
-            # leaf node?
-            if ndata <= leafsize:
-                _didx = didx.copy()
-                _data = data.copy()
-                leaf = (_didx, _data, None, None, 0, 0)
-                self.kd_tree.append(leaf)
-
-            # not a leaf, split the data in two
-            else:
-                splitdim = depth % ndim
-                idx = np.argsort(data[splitdim,:], kind='mergesort')
-                data[:,:] = data[:,idx]
-                didx = didx[idx]
-                nodeptr = len(self.kd_tree)
-                stack.append((data[:,:ndata//2], didx[:ndata//2], depth+1, nodeptr, True))
-                stack.append((data[:,ndata//2:], didx[ndata//2:], depth+1, nodeptr, False))
-                splitval = data[splitdim,ndata//2]
-                if leftbranch:
-                    left_hrect = _left_hrect.copy()
-                    right_hrect = _left_hrect.copy()
-                else:
-                    left_hrect = _right_hrect.copy()
-                    right_hrect = _right_hrect.copy()
-                left_hrect[1, splitdim] = splitval
-                right_hrect[0, splitdim] = splitval
-                # append node to tree
-                self.kd_tree.append((None, None, left_hrect, right_hrect, None, None))
-
-    def intersect(self, hrect, r2, centroid):
-        """
-        checks if the hyperrectangle hrect intersects with the
-        hypersphere defined by centroid and r2
-        """
-        maxval = hrect[1,:]
-        minval = hrect[0,:]
-        p = centroid.copy()
-        idx = p < minval
-        p[idx] = minval[idx]
-        idx = p > maxval
-        p[idx] = maxval[idx]
-        return ((p-centroid)**2).sum() < r2
-
-    def quadratic_knn_search(self, data, lidx, ldata, K):
-        """ find K nearest neighbours of data among ldata """
-        ndata = ldata.shape[1]
-        K = K if K < ndata else ndata
-        sqd = ((ldata - data[:,:ndata])**2).sum(axis=0)
-        idx = np.argsort(sqd, kind='mergesort')
-        idx = idx[:K]
-        return list(zip(sqd[idx], lidx[idx]))
-
-    def search_kdtree(self, datapoint, K=1):
-        """ find the k nearest neighbours of datapoint in a kdtree """
-        stack = [self.kd_tree[0]]
-        knn = [(np.inf, None)]*K
-        _datapt = datapoint[:,0]
-        while stack:
-
-            leaf_idx, leaf_data, left_hrect, \
-                    right_hrect, left, right = stack.pop()
-
-            # leaf
-            if leaf_idx is not None:
-                _knn = self.quadratic_knn_search(datapoint, leaf_idx, leaf_data, K)
-                if _knn[0][0] < knn[-1][0]:
-                    knn = sorted(knn + _knn)[:K]
-
-            # not a leaf
-            else:
-
-                # check left branch
-                if self.intersect(left_hrect, knn[-1][0], _datapt):
-                    stack.append(self.kd_tree[left])
-
-                # chech right branch
-                if self.intersect(right_hrect, knn[-1][0], _datapt):
-                    stack.append(self.kd_tree[right])
-        return knn
+  def euclidean (self, x, y):
+    if hasattr(x, '__len__') and hasattr(x[0], '__len__'):return np.linalg.norm(np.subtract(x, y), axis=1)
+    if hasattr(y, '__len__') and hasattr(y[0], '__len__'): return np.linalg.norm(np.subtract(x, y), axis=1)
+    # No axis 1 is found on either x or y
+    return np.linalg.norm(np.subtract(x, y), axis=None)
 
 class CustomKDTreeConverter(BaseConverter):
+  LEAF_SIZE = 2048
 
-    def convert(self):
-        kd_tree = KDTree()
-        # Make a copy because build_kdtree rewrites input data
-        # but we need original colors because of indexes
-        copy_colors = np.transpose(np.copy(self.colors))
-        kd_tree.build_kdtree(copy_colors)
+  def convert(self):
+    kd_tree = KDTree()
+    # Make a copy because build_kdtree rewrites input data
+    # but we need original colors because of indexes
+    copy_colors = self.colors.tolist()
+    kd_tree.build_kdtree(copy_colors, AlternateMedian(stopping_criteria= lambda x: len(x)<=self.LEAF_SIZE))
 
-
-        for x in range(len(self.input_image)):
-            row = []
-            for img_color in self.input_image[x]:
-                data = kd_tree.search_kdtree(img_color.reshape((3, 1)))
-                # for K=1, data = [(123,12)]
-                # where 123 - squared-distance, 12 - color index in color palette
-                row.append(self.colors[data[0][1]])
-            self.new_image.append(row)
+    for x in range(len(self.input_image)):
+      row = []
+      for img_color in self.input_image[x]:
+        data = kd_tree.search_knn(img_color.tolist(), k = 1)[0]  # take the first in case many same dist neighbors found
+        row.append(data)
+      self.new_image.append(row)

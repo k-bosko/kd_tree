@@ -1,8 +1,8 @@
 input_file,image_resolution,num_input_colors,num_output_colors,time_naive,time_kd-tree,time_scipy
-color_wheel_square.png,90000,68850,1024,188.72,8.27,3.21
-color_wheel_square.png,90000,68850,128,25.6,5.25,2.41
-color_wheel_square.png,90000,68850,8192,1404.87,36.68,3.64
-color_wheel_square.png,90000,68850,4096,708.31,20.89,3.47
-color_wheel_square.png,90000,68850,256,45.97,5.52,2.6
-color_wheel_square.png,90000,68850,512,88.67,6.15,2.53
-color_wheel_square.png,90000,68850,2048,355.11,11.8,3.07
+color_wheel_square.png,90000,68850,1024,203.69,69.77,2.66
+color_wheel_square.png,90000,68850,128,25.16,9.74,2.79
+color_wheel_square.png,90000,68850,8192,1576.56,118.24,2.6
+color_wheel_square.png,90000,68850,4096,780.62,110.06,3.12
+color_wheel_square.png,90000,68850,256,49.67,18.3,2.77
+color_wheel_square.png,90000,68850,512,99.66,34.54,2.75
+color_wheel_square.png,90000,68850,2048,393.38,130.39,2.59

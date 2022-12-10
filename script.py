@@ -1,9 +1,10 @@
 from time import perf_counter
 import pandas as pd
 from algos.colors import get_colors
-from algos.custom_kdtree import CustomKDTreeConverter
 from algos.naive import NaiveConverter
 from algos.scipy_kdtree import ScipyKDTreeConverter
+from algos.custom_kdtree import CustomKDTreeConverter
+
 from glob import glob
 from collections import defaultdict
 from PIL import Image
@@ -37,7 +38,6 @@ for colors_f in color_files:
         results_dict["input_file"].append(image_f.split("/")[-1])
         is_image_read = False
         for converter_name in ["scipy", "kd-tree", "naive"]:
-        # for converter_name in ["scipy", "kd-tree"]:
             if converter_name == "scipy":
                 converter = ScipyKDTreeConverter(image_f, colors)
             elif converter_name == "kd-tree":

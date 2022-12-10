@@ -2,9 +2,9 @@ from argparse import ArgumentParser, FileType
 from time import perf_counter
 
 from algos.colors import get_colors
-from algos.custom_kdtree import CustomKDTreeConverter
 from algos.naive import NaiveConverter
 from algos.scipy_kdtree import ScipyKDTreeConverter
+from algos.custom_kdtree import CustomKDTreeConverter
 
 if __name__ == '__main__':
     parser = ArgumentParser(
@@ -62,7 +62,7 @@ if __name__ == '__main__':
         print('Custom KD Tree Conversion')
         conversion = CustomKDTreeConverter(args.input, colors)
     else:
-        print('Please specify either -k, -s or -n to choose algoritm')
+        print('Please specify either -k, -s or -n to choose an algorithm')
         exit(1)
 
     conversion.convert()
