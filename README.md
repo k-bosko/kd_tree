@@ -4,6 +4,10 @@
 
 Final Project for CS5800 Algorithms class at the Northeastern University
 
+## My contribution
+
+I proposed the project idea and was responsible for implementing the testing part using recoloring approach, including measuring the performance.
+
 ## Project Description
 
 The Nearest Neighbor Problem is the problem of finding the point in a dataset that is closest to a given query point. The generalized k-Nearest Neighbors algorithm (KNN) that finds k-number of most similar points is very popular in Machine Learning for classification tasks. There are many algorithms for solving the nearest neighbor problem. In this project, we explored one of them - the KD Tree algorithm. Developed by Jon Louis Bentley in 1975, KD Tree has been widely adopted due to its simplicity and efficiency and is used in different fields Clustering, Recommendation, Computer Vision, and many others.
@@ -26,6 +30,7 @@ As an input image, a squared color wheel was chosen because it contains 68,850 u
 ## Nearest neighbor problem formulation
 In this formulation of the nearest neighbor problem as a recoloring problem, the “nearest” is judged by the Euclidean distances between colors. For instance, if we have two colors - paletteColor: [13, 57, 71] and imgColor [194, 191, 186], the distance between them is:
 
+<img src=https://github.com/k-bosko/kd_tree/blob/main/assets/NN-distance-formula.png width=500 >
 
 ## KD Tree implementation benchmarks
 We compare the performance of our KD-Tree implementation against two other benchmarks:
@@ -44,4 +49,7 @@ A script was written in Python to automate the task of measuring the performance
 The algorithm’s performance was measured by timing how long it took to find the nearest neighbor for each pixel’s color from the color palette. Given that we have 7 color palettes and 3 algorithms, this results in 21 different measurements. perf_counter() was used as a timing function before starting the search and immediately after the search was finished. The final time elapsed is the difference between starting and ending time. 
 
 ## Results
+Image recoloring outputs for different color palettes:<br>
+<img src=https://github.com/k-bosko/kd_tree/blob/main/assets/image-recoloring-results.png width=500 >
 
+<img src=https://github.com/k-bosko/kd_tree/blob/main/assets/performance-results.png width=700 >
